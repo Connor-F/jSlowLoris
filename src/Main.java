@@ -28,7 +28,7 @@ public class Main
         {
             try
             {
-                new Connector(args[1], port, timer);
+                new Connector(args[0], port, timer).run();
             }
             catch(MalformedURLException mue)
             {
@@ -46,6 +46,4 @@ public class Main
         System.err.println(deathMsg);
         System.exit(-1);
     }
-
-
 }

